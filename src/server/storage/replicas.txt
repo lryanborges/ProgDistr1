@@ -1,0 +1,55 @@
+Registry register = LocateRegistry.createRegistry(5002);
+			register.rebind("Storage1", server);
+
+			gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5002, "Loja1", true);
+
+			scanner.nextLine();
+
+			Registry follower = LocateRegistry.getRegistry(5003);
+			followerServer1 = (StorageInterface) follower.lookup("Storage2");
+
+			follower = LocateRegistry.getRegistry(5004);
+			followerServer2 = (StorageInterface) follower.lookup("Storage3");
+
+			Registry base = LocateRegistry.getRegistry(5010);
+			database = (DatabaseInterface) base.lookup("Database1");
+
+			System.out.println("Servidor de Armazenamento-1 ligado.");
+
+
+Registry register = LocateRegistry.createRegistry(5003);
+			register.rebind("Storage2", server);
+
+			gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5003, "Loja2", true);
+
+			scanner.nextLine();
+
+			Registry follower = LocateRegistry.getRegistry(5002);
+			followerServer1 = (StorageInterface) follower.lookup("Storage1");
+
+			follower = LocateRegistry.getRegistry(5004);
+			followerServer2 = (StorageInterface) follower.lookup("Storage3");
+
+			Registry base = LocateRegistry.getRegistry(5011);
+			database = (DatabaseInterface) base.lookup("Database2");
+
+			System.out.println("Servidor de Armazenamento-2 ligado.");
+
+
+Registry register = LocateRegistry.createRegistry(5004);
+			register.rebind("Storage3", server);
+
+			gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5004, "Loja3", true);
+
+			scanner.nextLine();
+
+			Registry follower = LocateRegistry.getRegistry(5002);
+			followerServer1 = (StorageInterface) follower.lookup("Storage1");
+
+			follower = LocateRegistry.getRegistry(5003);
+			followerServer2 = (StorageInterface) follower.lookup("Storage2");
+
+			Registry base = LocateRegistry.getRegistry(5012);
+			database = (DatabaseInterface) base.lookup("Database3");
+
+			System.out.println("Servidor de Armazenamento-3 ligado.");
