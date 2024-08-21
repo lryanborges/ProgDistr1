@@ -17,6 +17,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import crypto.Encrypter;
 import crypto.Hasher;
@@ -48,6 +52,9 @@ public class StorageServer implements StorageInterface {
 	
 	private static String ipGateway = "10.215.34.249";
 	
+	private static ScheduledExecutorService executor;
+	private static String status = "desligado";
+	
 	public StorageServer(ServerRole r) {
 		role = r;
 	}
@@ -59,45 +66,57 @@ public class StorageServer implements StorageInterface {
 		scanner = new Scanner(System.in);
 		myRSAKeys = MyKeyGenerator.generateKeysRSA();
 
-		ConnectionTry connection = () -> {
+		executor = Executors.newScheduledThreadPool(1);
+		
+		Runnable connection = () -> {
 			try {
 				int storageNumber = connectionNumber + 1;
 				
 				StorageInterface server = (StorageInterface) UnicastRemoteObject.exportObject(storServer, 0);
 				
-				String storageName = "Storage" + storageNumber;
+				String storageName = "Storage" + connectionNumber;
 				Registry register = LocateRegistry.createRegistry(5002 + connectionNumber);
 				register.rebind(storageName, server);
 
 				gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5002 + connectionNumber, ("Loja" + storageNumber), true);
 
-				scanner.nextLine();
+				//scanner.nextLine();
 
-				int firstConnection = ((connectionNumber + 1) % 3);
-				String firstConnectionName = "Storage" + (storageNumber + 1);
-				Registry follower = LocateRegistry.getRegistry(5002 + firstConnection);
-				followerServer1 = (StorageInterface) follower.lookup(firstConnectionName);
-
-				int secondConnection = ((connectionNumber + 2) % 3);
-				String secondConnectionName = "Storage" + (storageNumber + 1);
-				follower = LocateRegistry.getRegistry(5002 + secondConnection);
-				followerServer2 = (StorageInterface) follower.lookup(secondConnectionName);
-
-				String databaseName = "Database" + (connectionNumber + 1);
+				try {
+					int firstConnection = ((connectionNumber + 1) % 3);
+					String firstConnectionName = "Storage" + ((connectionNumber + 1) % 3) ;
+					Registry follower = LocateRegistry.getRegistry(5002 + firstConnection);
+					followerServer1 = (StorageInterface) follower.lookup(firstConnectionName);
+				} catch(Exception e) {
+					System.out.println("Tentando conexão...");
+				}
+				
+				try {
+					int secondConnection = ((connectionNumber + 2) % 3);
+					String secondConnectionName = "Storage" + ((connectionNumber + 2) % 3);
+					Registry follower = LocateRegistry.getRegistry(5002 + secondConnection);
+					followerServer2 = (StorageInterface) follower.lookup(secondConnectionName);
+				} catch(Exception e) {
+					System.out.println("Tentando conexão...");
+				}
+				
+				String databaseName = "Database" + storageNumber;
 				Registry base = LocateRegistry.getRegistry(5010 + connectionNumber);
 				database = (DatabaseInterface) base.lookup(databaseName);
-
-				System.out.println("Servidor de Armazenamento-" + storageNumber + " ligado.");
+			
+				status = "ligado";
+				System.out.println("Servidor de Armazenamento-" + storageNumber + " " + status + ".");
+				executor.shutdown();				
 				
-			} catch (RemoteException e) {
-				e.printStackTrace();
-			} catch (NotBoundException e) {
-				e.printStackTrace();
+			} catch (RemoteException | NotBoundException e) {
+				System.out.println("Tentando conexão...");
 			}
 		};
 		
-		connection.connect();
-			
+		
+		executor.scheduleAtFixedRate(connection, 0, 10, TimeUnit.SECONDS);
+
+		
 	}
 
 	@Override
