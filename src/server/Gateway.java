@@ -46,7 +46,7 @@ public class Gateway implements GatewayInterface {
 	private static RSAKeys currentStorKeys;
 	
 	static String authenticationHostName = "Authentication";
-	static String storageHostName[] = {"Storage1","Storage2","Storage3"};
+	static String storageHostName[] = {"Storage0","Storage1","Storage2"};
 	static AuthInterface authServer;
 	static StorageInterface storServer;
 	static List<StorageInterface> stores;
