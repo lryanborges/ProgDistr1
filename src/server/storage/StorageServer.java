@@ -21,14 +21,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import crypto.Encrypter;
 import crypto.Hasher;
 import crypto.MyKeyGenerator;
 import datagrams.Message;
 import datagrams.Permission;
+import functional_interfaces.PermissionCheck;
 import model.Car;
 import model.EconomicCar;
 import model.ExecutiveCar;
@@ -51,7 +50,7 @@ public class StorageServer implements StorageInterface {
 	private static Permission gatewayPermission;
 	private static Permission backdoorPermission;
 	
-	private static String ipGateway = "10.215.34.249";
+	private static String ipGateway = "26.15.5.193";
 	
 	private static ExecutorService executor;
 	private static int connectionWeight = 0;
@@ -81,7 +80,6 @@ public class StorageServer implements StorageInterface {
 				Registry register = LocateRegistry.createRegistry(5002 + connectionNumber);
 				register.rebind(storageName, server);
 			} catch (RemoteException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5002 + connectionNumber, ("Loja" + storageNumber), true);
@@ -100,7 +98,6 @@ public class StorageServer implements StorageInterface {
 				try {
 					Thread.sleep(10000);
 				} catch (InterruptedException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 			}
@@ -119,7 +116,6 @@ public class StorageServer implements StorageInterface {
 				try {
 					Thread.sleep(10000);
 				} catch (InterruptedException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 			}
@@ -154,7 +150,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public void addCar(Car newCar) throws RemoteException {
-		if(role == ServerRole.LEADER && StorageServer.getPermission()) {
+		if(role == ServerRole.LEADER && getPermission(StorageServer::getPermissionLogic)) {
 			database.addCar(newCar);
 			database.attServer();
 			System.out.println("Carro adicionado com sucesso.");
@@ -164,7 +160,7 @@ public class StorageServer implements StorageInterface {
 	@Override
 	public void editCar(String renavam, Car editedCar) throws RemoteException {
 		
-		if(role == ServerRole.LEADER && StorageServer.getPermission()) {
+		if(role == ServerRole.LEADER && getPermission(StorageServer::getPermissionLogic)) {
 			database.editCar(renavam, editedCar);
 			database.attServer();
 			System.out.println("Carro de renavam " + renavam + " editado com sucesso.");
@@ -174,7 +170,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public void deleteCar(String renavam) throws RemoteException {
-		if(role == ServerRole.LEADER && StorageServer.getPermission()) {
+		if(role == ServerRole.LEADER && getPermission(StorageServer::getPermissionLogic)) {
 			database.deleteCar(renavam);
 			database.attServer();
 			System.out.println("Carro de renavam " + renavam + " deletado com sucesso.");
@@ -183,7 +179,7 @@ public class StorageServer implements StorageInterface {
 	
 	@Override
 	public void deleteCars(String name) throws RemoteException {
-		if(role == ServerRole.LEADER && StorageServer.getPermission()) {
+		if(role == ServerRole.LEADER && getPermission(StorageServer::getPermissionLogic)) {
 			database.deleteCars(name);
 			database.attServer();
 			System.out.println("Todos os carros " + name + " deletados com sucesso.");
@@ -192,7 +188,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public List<Car> listCars() throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			System.out.println("Lista de carros enviada.");
 			List<Car> cars = database.listCars();
 			return database.listCars();	
@@ -203,7 +199,7 @@ public class StorageServer implements StorageInterface {
 	
 	@Override
 	public List<Car> listCars(int category) throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			System.out.println("Lista de carros da categoria " + category + " enviada.");
 			return database.listCars(category);	
 		}
@@ -213,7 +209,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public Car searchCar(String renavam) throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			Car car = database.searchCar(renavam);
 			return car;	
 		}
@@ -222,7 +218,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public List<Car> searchCars(String name) throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			List<Car> list = searchCars(name);
 			return list;	
 		}
@@ -233,7 +229,7 @@ public class StorageServer implements StorageInterface {
 	@Override
 	public Car buyCar(String renavam) throws RemoteException {
 		
-		if(role == ServerRole.LEADER && StorageServer.getPermission()) {
+		if(role == ServerRole.LEADER && getPermission(StorageServer::getPermissionLogic)) {
 			System.out.println("ENTREI");
 			Car car = database.buyCar(renavam);
 			database.attServer();
@@ -246,7 +242,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public int getAmount(int category) throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			int amount = database.getAmount(category);
 			return amount;	
 		}
@@ -310,7 +306,7 @@ public class StorageServer implements StorageInterface {
 	@Override
 	public Message<String> receiveMessage(Message<String> msg) throws RemoteException {
 		// permissões p serviço da loja
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			Keys currentClient = gatewayKeys;
 			
 			if(currentClient != null) {
@@ -436,11 +432,13 @@ public class StorageServer implements StorageInterface {
 		
 		return null;
 	}
-	
-	public static boolean getPermission() {
-		
+
+	public static boolean getPermission(PermissionCheck permissionCheck) {
+		return permissionCheck.checkPermission();
+	}
+
+	public static boolean getPermissionLogic() {
 		String sourceIp = "";
-		
 		
 		try {
 			sourceIp = RemoteServer.getClientHost();
@@ -459,6 +457,7 @@ public class StorageServer implements StorageInterface {
 			return false;
 		}
 	}
+	
 	private static String getIp() {
         String ip = "127.0.0.1";
 

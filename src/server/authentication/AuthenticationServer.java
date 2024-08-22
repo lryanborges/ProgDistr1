@@ -9,7 +9,6 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.rmi.AlreadyBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -17,14 +16,13 @@ import java.rmi.server.RemoteServer;
 import java.rmi.server.ServerNotActiveException;
 import java.rmi.server.UnicastRemoteObject;
 import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
 import crypto.PasswordEncoder;
 import datagrams.Permission;
+import functional_interfaces.PermissionCheck;
 import model.User;
-import server.Gateway;
 
 public class AuthenticationServer implements AuthInterface {
 
@@ -35,7 +33,7 @@ public class AuthenticationServer implements AuthInterface {
 
 	private static Permission gatewayPermission;
 	
-	private static String ipGateway = "10.215.34.249";
+	private static String ipGateway = "26.15.5.193";
 	
 	public AuthenticationServer() {
 		try { // tenta abrir
@@ -51,7 +49,6 @@ public class AuthenticationServer implements AuthInterface {
 		}
 		
 		users = getFileUsers();
-
 	}
 
 	public static void main(String[] args) {
@@ -91,14 +88,15 @@ public class AuthenticationServer implements AuthInterface {
 
 	@Override
 	public void registerUser(User newUser) {
-		if(AuthenticationServer.getPermission()) {
+		if(getPermission(AuthenticationServer::checkPermissionLogic)) {
 			users = getFileUsers(); // pega do arquivo e bota no mapa
 			
 			try {
 				byte[] salt = PasswordEncoder.getSalt();
 				newUser.setPassword(PasswordEncoder.getHash(newUser.getPassword(), salt)); // Criptografa a senha do usuário para salvar no mapa
 				newUser.setSalt(salt); // salva o salt junto do usuário
-			} catch (NoSuchAlgorithmException e) {
+			} 
+			catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 			}
 
@@ -111,7 +109,7 @@ public class AuthenticationServer implements AuthInterface {
 
 	@Override
 	public User loginUser(String cpf, String password) {
-		if(AuthenticationServer.getPermission()) {
+		if(getPermission(AuthenticationServer::checkPermissionLogic)) {
 			for (Entry<String, User> user : users.entrySet()) {
 				if (cpf.equals(user.getKey())) {
 					byte[] salt = user.getValue().getSalt(); // define o salt deste usuário
@@ -151,7 +149,11 @@ public class AuthenticationServer implements AuthInterface {
 		return users;
 	}
 	
-	public static boolean getPermission() {
+	public static boolean getPermission(PermissionCheck permissionCheck) {
+		return permissionCheck.checkPermission();
+	}
+
+	public static boolean checkPermissionLogic() {
 		
 		String sourceIp = "";
 		
