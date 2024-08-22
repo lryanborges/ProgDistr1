@@ -17,8 +17,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -27,7 +29,6 @@ import crypto.Hasher;
 import crypto.MyKeyGenerator;
 import datagrams.Message;
 import datagrams.Permission;
-import functional_interfaces.ConnectionTry;
 import model.Car;
 import model.EconomicCar;
 import model.ExecutiveCar;
@@ -52,71 +53,103 @@ public class StorageServer implements StorageInterface {
 	
 	private static String ipGateway = "10.215.34.249";
 	
-	private static ScheduledExecutorService executor;
-	private static String status = "desligado";
+	private static ExecutorService executor;
+	private static int connectionWeight = 0;
+	private static boolean connected1 = false;
+	private static boolean connected2 = false;
 	
 	public StorageServer(ServerRole r) {
 		role = r;
 	}
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException, ExecutionException {
 		
-		StorageServer storServer = new StorageServer(ServerRole.LEADER);
-		int connectionNumber = 0;
+		StorageServer storServer = new StorageServer(ServerRole.FOLLOWER);
+		int connectionNumber = 2;
 		scanner = new Scanner(System.in);
 		myRSAKeys = MyKeyGenerator.generateKeysRSA();
 
-		executor = Executors.newScheduledThreadPool(1);
+		executor = Executors.newSingleThreadExecutor();
+		int storageNumber = connectionNumber + 1;
+		connectionWeight = connectionNumber + 1;
 		
-		Runnable connection = () -> {
+		Runnable start = () -> {
+			StorageInterface server;
 			try {
-				int storageNumber = connectionNumber + 1;
-				
-				StorageInterface server = (StorageInterface) UnicastRemoteObject.exportObject(storServer, 0);
-				
+				server = (StorageInterface) UnicastRemoteObject.exportObject(storServer, 0);
 				String storageName = "Storage" + connectionNumber;
 				Registry register = LocateRegistry.createRegistry(5002 + connectionNumber);
 				register.rebind(storageName, server);
-
-				gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5002 + connectionNumber, ("Loja" + storageNumber), true);
-
-				//scanner.nextLine();
-
-				try {
-					int firstConnection = ((connectionNumber + 1) % 3);
-					String firstConnectionName = "Storage" + ((connectionNumber + 1) % 3) ;
-					Registry follower = LocateRegistry.getRegistry(5002 + firstConnection);
-					followerServer1 = (StorageInterface) follower.lookup(firstConnectionName);
-				} catch(Exception e) {
-					System.out.println("Tentando conexão...");
-				}
+			} catch (RemoteException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			gatewayPermission = new Permission(ipGateway, "127.0.0.1", 5002 + connectionNumber, ("Loja" + storageNumber), true);
+		};
+		
+		Runnable connection1 = () -> {
+			try {
+				int firstConnection = ((connectionNumber + 1) % 3);
+				String firstConnectionName = "Storage" + ((connectionNumber + 1) % 3) ;
+				Registry follower = LocateRegistry.getRegistry(5002 + firstConnection);
+				followerServer1 = (StorageInterface) follower.lookup(firstConnectionName);	
 				
+				connected1 = true;
+			} catch (RemoteException | NotBoundException e) {
+				System.out.println("Tentando conexão...");
 				try {
-					int secondConnection = ((connectionNumber + 2) % 3);
-					String secondConnectionName = "Storage" + ((connectionNumber + 2) % 3);
-					Registry follower = LocateRegistry.getRegistry(5002 + secondConnection);
-					followerServer2 = (StorageInterface) follower.lookup(secondConnectionName);
-				} catch(Exception e) {
-					System.out.println("Tentando conexão...");
+					Thread.sleep(10000);
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
 				}
+			}
+		};
+		
+		Runnable connection2 = () -> {
+			try {
+				int secondConnection = ((connectionNumber + 2) % 3);
+				String secondConnectionName = "Storage" + ((connectionNumber + 2) % 3);
+				Registry follower = LocateRegistry.getRegistry(5002 + secondConnection);
+				followerServer2 = (StorageInterface) follower.lookup(secondConnectionName);
 				
+				connected2 = true;
+			} catch (RemoteException | NotBoundException e) {
+				System.out.println("Tentando conexão...");
+				try {
+					Thread.sleep(10000);
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		};
+		
+		Runnable databaseConnection = () -> {
+			try {
 				String databaseName = "Database" + storageNumber;
 				Registry base = LocateRegistry.getRegistry(5010 + connectionNumber);
 				database = (DatabaseInterface) base.lookup(databaseName);
 			
-				status = "ligado";
-				System.out.println("Servidor de Armazenamento-" + storageNumber + " " + status + ".");
-				executor.shutdown();				
-				
+				System.out.println("Servidor de Armazenamento-" + storageNumber + " ligado.");
+				executor.shutdown();		
+
 			} catch (RemoteException | NotBoundException e) {
 				System.out.println("Tentando conexão...");
 			}
 		};
-		
-		
-		executor.scheduleAtFixedRate(connection, 0, 10, TimeUnit.SECONDS);
+				
+		executor.submit(start);
+		while(!connected1) {
+			Future<?> future1 = executor.submit(connection1);
+			future1.get();
+		}
+		while(!connected2) {
+			Future<?> future2 = executor.submit(connection2);
+			future2.get();
+		}
+		executor.submit(databaseConnection);
 
-		
 	}
 
 	@Override

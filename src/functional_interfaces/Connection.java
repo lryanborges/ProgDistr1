@@ -1,6 +1,6 @@
 package functional_interfaces;
 
 @FunctionalInterface
-public interface ConnectionTry {
+public interface Connection {
 	void connect();
 }

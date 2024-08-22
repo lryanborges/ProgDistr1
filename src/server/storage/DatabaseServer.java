@@ -53,7 +53,7 @@ public class DatabaseServer implements DatabaseInterface {
     }
 
     public static void main(String[] args) {
-        DatabaseServer dataServer = new DatabaseServer(2);
+        DatabaseServer dataServer = new DatabaseServer(0);
         
         storagePermission = new Permission(ipLoja, "127.0.0.1", 5010 + myPath, "Loja de carros", true);
         
