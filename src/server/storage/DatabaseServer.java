@@ -38,7 +38,7 @@ public class DatabaseServer implements DatabaseInterface {
     
     private static Permission storagePermission;
     
-    private static String ipLoja = "10.215.34.156";
+    private static String ipLoja = "192.168.23.218";
 
     public DatabaseServer(int rep) {
         myPath = rep;	
@@ -54,7 +54,7 @@ public class DatabaseServer implements DatabaseInterface {
     }
 
     public static void main(String[] args) {
-        DatabaseServer dataServer = new DatabaseServer(0);
+        DatabaseServer dataServer = new DatabaseServer(1);
         
         storagePermission = new Permission(ipLoja, "127.0.0.1", 5010 + myPath, "Loja de carros", true);
         
@@ -237,7 +237,7 @@ public class DatabaseServer implements DatabaseInterface {
     public int getAmount(int category) throws RemoteException {
     	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars();
-    		//attServer();
+    		attServer();
     		
     		switch(category) {
     		case 1:

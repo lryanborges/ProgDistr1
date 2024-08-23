@@ -50,7 +50,7 @@ public class StorageServer implements StorageInterface {
 	private static Permission gatewayPermission;
 	private static Permission backdoorPermission;
 
-	private static String ipGateway = "10.215.34.156";
+	private static String ipGateway = "192.168.23.218";
   
 	private static ExecutorService executor;
 	private static int connectionWeight = 0;
@@ -58,9 +58,10 @@ public class StorageServer implements StorageInterface {
 	private static boolean connected1 = false;
 	private static boolean connected2 = false;
 	// ips fakes pra exemplificação do consistent hashing
-	private static String ipServer = "26.95.199.60";
+	//private static String ipServer = null;
+	//private static String ipServer = "26.95.199.60";
 	//private static String ipServer = "192.168.10.222";
-	//private static String ipServer = "40.180.45.45";
+	private static String ipServer = "40.180.45.45";
 	
 	public StorageServer(ServerRole r) {
 		role = r;
@@ -68,8 +69,8 @@ public class StorageServer implements StorageInterface {
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
 	
-		StorageServer storServer = new StorageServer(ServerRole.LEADER);
-		int connectionNumber = 0;
+		StorageServer storServer = new StorageServer(ServerRole.FOLLOWER);
+		int connectionNumber = 2;
 		scanner = new Scanner(System.in);
 		myRSAKeys = MyKeyGenerator.generateKeysRSA();
 
@@ -134,9 +135,11 @@ public class StorageServer implements StorageInterface {
 			
 				System.out.println("Servidor de Armazenamento-" + storageNumber + " ligado.");
 				
-				System.out.println("--------------------------------");
-				System.out.println("O ip do server é: " + ipServer);
-				System.out.println("--------------------------------");
+				if(ipServer != null) {
+					System.out.println("--------------------------------");
+					System.out.println("O ip do server é: " + ipServer);
+					System.out.println("--------------------------------");
+				}
 				
 				executor.shutdown();		
 
