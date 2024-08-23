@@ -58,18 +58,18 @@ public class StorageServer implements StorageInterface {
 	private static boolean connected1 = false;
 	private static boolean connected2 = false;
 	// ips fakes pra exemplificação do consistent hashing
-	//private static String ipServer = "26.95.199.60";
+	private static String ipServer = "26.95.199.60";
 	//private static String ipServer = "192.168.10.222";
-	private static String ipServer = "40.180.45.45";
+	//private static String ipServer = "40.180.45.45";
 	
 	public StorageServer(ServerRole r) {
 		role = r;
 	}
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
-		
-		StorageServer storServer = new StorageServer(ServerRole.FOLLOWER);
-		int connectionNumber = 2;
+	
+		StorageServer storServer = new StorageServer(ServerRole.LEADER);
+		int connectionNumber = 0;
 		scanner = new Scanner(System.in);
 		myRSAKeys = MyKeyGenerator.generateKeysRSA();
 
@@ -133,6 +133,11 @@ public class StorageServer implements StorageInterface {
 				database = (DatabaseInterface) base.lookup(databaseName);
 			
 				System.out.println("Servidor de Armazenamento-" + storageNumber + " ligado.");
+				
+				System.out.println("--------------------------------");
+				System.out.println("O ip do server é: " + ipServer);
+				System.out.println("--------------------------------");
+				
 				executor.shutdown();		
 
 			} catch (RemoteException | NotBoundException e) {
@@ -223,7 +228,7 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public List<Car> searchCars(String name) throws RemoteException {
-		if(StorageServer.getPermission()) {
+		if(getPermission(StorageServer::getPermissionLogic)) {
 			List<Car> list = database.searchCars(name);
 			return list;	
 		}
@@ -529,9 +534,6 @@ public class StorageServer implements StorageInterface {
 	
 	@Override
 	public String getIpServer() throws RemoteException {
-		System.out.println("--------------------------------");
-		System.out.println("O ip do server é: " + ipServer);
-		System.out.println("--------------------------------");
 		return ipServer;
 	}
 	

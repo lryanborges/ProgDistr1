@@ -90,6 +90,10 @@ public class ProcessClient {
 					if(timer <= 0) {
 						connected = false;
 						timer = 60;
+						System.out.println("------------------");
+						System.out.println("Você foi desconectado por inatividade.");
+						System.out.println("------------------");
+						
 					}
 				}
 			};
