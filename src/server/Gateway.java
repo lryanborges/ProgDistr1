@@ -21,8 +21,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.stream.IntStream;
 
 import crypto.Encrypter;
 import crypto.Hasher;
@@ -272,8 +270,7 @@ public class Gateway implements GatewayInterface {
 				
 				for(StorageInterface store : stores) {
 					if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
-						System.out.println("oewww");
-						System.out.println("Vai pro server: " + store.getIpServer());
+						System.out.println("Endereço IP do Server destinatário: " + store.getIpServer());
 						System.out.println("--------------------------------");
 						storServer = store;
 						
@@ -841,8 +838,6 @@ public class Gateway implements GatewayInterface {
 				} catch (InvalidKeyException | NoSuchAlgorithmException | UnsupportedEncodingException e1) {
 					e1.printStackTrace();
 				}
-			} else {
-				System.out.println("Cliente não existe.");
 			}
 		}
 		
@@ -896,8 +891,8 @@ public class Gateway implements GatewayInterface {
 		permitAccess.permit("192.168.144.112");
 		// ryan client
 		permitAccess.permit("192.168.144.218");
-		// ryan client 15/08/2024
-		permitAccess.permit("10.215.34.249");
+		// ryan client 22/08/2024
+		permitAccess.permit("192.168.1.4");
 		// vinicius client 22/08/2024
 		permitAccess.permit("26.15.5.193");
 
@@ -943,11 +938,11 @@ public class Gateway implements GatewayInterface {
         Collections.sort(sortedHashes);
     }
 
-    private static void removeStorageServer(String server) {
+    /*private static void removeStorageServer(String server) {
         BigInteger hash = Hasher.hashIp(server);
         serverMap.remove(hash);
         sortedHashes.remove(hash);
-    }
+    }*/
     
     private static String getServer(String ip) {
         BigInteger hash = Hasher.hashIp(ip);
