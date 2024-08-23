@@ -35,7 +35,7 @@ public class AuthenticationServer implements AuthInterface {
 
 	private static Permission gatewayPermission;
 	
-	private static String ipGateway = "10.215.34.249";
+	private static String ipGateway = "192.168.1.4";
 	
 	public AuthenticationServer() {
 		try { // tenta abrir

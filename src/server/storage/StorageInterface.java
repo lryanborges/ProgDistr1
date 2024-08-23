@@ -34,4 +34,10 @@ public interface StorageInterface extends Remote {
 	public Message<String> receiveMessage(Message<String> msg) throws RemoteException;	
 	
 	public void setPermission(Permission permission) throws RemoteException;
+	
+	public int getConnectionWeight() throws RemoteException;
+	public int incrementConnectionNumber() throws RemoteException;
+	public int getConnectionNumber() throws RemoteException;
+	public int incrementRR() throws RemoteException;
+	public String getIpServer() throws RemoteException;
 }

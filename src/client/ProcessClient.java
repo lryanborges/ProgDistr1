@@ -62,15 +62,15 @@ public class ProcessClient {
 		myKeys.setRsaKeys(new RSAKeys(myRsaKeys.getPublicKey(), myRsaKeys.getnMod()));
 		
 		try {
-			Registry gatRegister = LocateRegistry.getRegistry(5000);
+			Registry gatRegister = LocateRegistry.getRegistry("192.168.1.4", 5000);
 			gateway = (GatewayInterface) gatRegister.lookup("Gateway");
 			
 			// pra demonstração do firewall
-			Registry storRegister = LocateRegistry.getRegistry(5002);
+			Registry storRegister = LocateRegistry.getRegistry("192.168.1.4", 5002);
 			storServer = (StorageInterface) storRegister.lookup("Storage0");
 			
 			// pra demonstração do firewall
-			Registry dataRegister = LocateRegistry.getRegistry(5010);
+			Registry dataRegister = LocateRegistry.getRegistry("192.168.1.4", 5010);
 			dataServer = (DatabaseInterface) dataRegister.lookup("Database1");
 			
 			gateway.addNewClientKeys(clientNumber, myKeys); // manda suas chaves pro server
@@ -95,8 +95,8 @@ public class ProcessClient {
 					if(connectedUser != null) {
 						connected = true;
 					} else {
-						System.out.println("Login ou senha incorretos. " + ProcessClient.passwordTries + " tentativas restantes.");
 						ProcessClient.passwordTries--;
+						System.out.println("Login ou senha incorretos. " + ProcessClient.passwordTries + " tentativas restantes.");
 						if(ProcessClient.passwordTries == 0) {
 							System.out.println("Sistema bloqueado por 10 segundos.");
 							System.out.println("------------------------");
@@ -622,7 +622,7 @@ public class ProcessClient {
 		String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavamToBuy);
 		String signature = Encrypter.signMessage(myKeys, hmac);
 		
-		Message<String> response = gateway.receiveMessage(new Message<String>(2, msgEncrypted, signature, clientNumber));
+		Message<String> response = gateway.receiveMessage(new Message<String>(2000, msgEncrypted, signature, clientNumber));
 		
 		String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 		String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
@@ -651,7 +651,7 @@ public class ProcessClient {
 				
 				decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 				realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-					
+				
 				validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
 				
 				if(validSignature) {
