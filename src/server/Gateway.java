@@ -29,6 +29,7 @@ import crypto.Hasher;
 import crypto.MyKeyGenerator;
 import datagrams.Message;
 import datagrams.Permission;
+import functional_interfaces.PermitFirewall;
 import model.Car;
 import model.EconomicCar;
 import model.ExecutiveCar;
@@ -884,30 +885,22 @@ public class Gateway implements GatewayInterface {
 	}
 	
 	public static void setPermissions() {
-		permissions.add(new Permission("127.0.0.1", "127.0.0.1", 5001, "Autenticação", true));
-		permissions.add(new Permission("127.0.0.1", "127.0.0.2", 5002, "Loja1", true));
-		permissions.add(new Permission("127.0.0.1", "127.0.0.3", 5003, "Loja2", true));
-		permissions.add(new Permission("127.0.0.1", "127.0.0.4", 5004, "Loja3", true));
+		PermitFirewall permitAccess = (str) -> {
+			permissions.add(new Permission(str, "127.0.0.1", 5001, "Autenticação", true));
+			permissions.add(new Permission(str, "127.0.0.2", 5002, "Loja1", true));
+			permissions.add(new Permission(str, "127.0.0.3", 5003, "Loja2", true));
+			permissions.add(new Permission(str, "127.0.0.4", 5004, "Loja3", true));
+		};
 		
 		//vinicius client
-		permissions.add(new Permission("192.168.144.112", "127.0.0.1", 5001, "Autenticação", true));
-		permissions.add(new Permission("192.168.144.112", "127.0.0.1", 5002, "Loja1", true));
-		permissions.add(new Permission("192.168.144.112", "127.0.0.1", 5003, "Loja2", true));
-		permissions.add(new Permission("192.168.144.112", "127.0.0.1", 5004, "Loja3", true));
-		
+		permitAccess.permit("192.168.144.112");
 		// ryan client
-		permissions.add(new Permission("192.168.144.218", "127.0.0.1", 5001, "Autenticação", true));
-		permissions.add(new Permission("192.168.144.218", "127.0.0.1", 5002, "Loja1", true));
-		permissions.add(new Permission("192.168.144.218", "127.0.0.1", 5003, "Loja2", true));
-		permissions.add(new Permission("192.168.144.218", "127.0.0.1", 5004, "Loja3", true));
-		
-		// ryan client 22/08/2024
-		permissions.add(new Permission("192.168.1.4", "127.0.0.1", 5001, "Autenticação", true));
-		permissions.add(new Permission("192.168.1.4", "127.0.0.1", 5002, "Loja1", true));
-		permissions.add(new Permission("192.168.1.4", "127.0.0.1", 5003, "Loja2", true));
-		permissions.add(new Permission("192.168.1.4", "127.0.0.1", 5004, "Loja3", true));
-		
-		
+		permitAccess.permit("192.168.144.218");
+		// ryan client 15/08/2024
+		permitAccess.permit("10.215.34.249");
+		// vinicius client 22/08/2024
+		permitAccess.permit("26.15.5.193");
+
 	}
 	
 	private static String getIp() {

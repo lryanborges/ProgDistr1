@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import datagrams.Permission;
+import functional_interfaces.PermissionCheck;
 import model.Car;
 import model.EconomicCar;
 import model.ExecutiveCar;
@@ -53,7 +54,7 @@ public class DatabaseServer implements DatabaseInterface {
     }
 
     public static void main(String[] args) {
-        DatabaseServer dataServer = new DatabaseServer(0);
+        DatabaseServer dataServer = new DatabaseServer(2);
         
         storagePermission = new Permission(ipLoja, "127.0.0.1", 5010 + myPath, "Loja de carros", true);
         
@@ -73,7 +74,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     synchronized public void addCar(Car newCar) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
     		cars = getFileCars(); // pega do arquivo e bota no mapa
     		cars.put(newCar.getRenavam(), newCar); // add no mapa
     	}
@@ -81,7 +82,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     synchronized public void editCar(String renavam, Car editedCar) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
     		cars = getFileCars(); // att o mapa pra versao mais recente
     		Car editCar = searchCar(renavam);
 
@@ -124,7 +125,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     synchronized public void deleteCar(String renavam) throws RemoteException {
-       if(DatabaseServer.getPermission()) {
+       if(getPermission(DatabaseServer::getPermissionLogic)) {
     	   	cars = getFileCars(); // att o mapa pra versao mais recente
    			Car deleteCar = searchCar(renavam);
 
@@ -136,7 +137,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     synchronized public void deleteCars(String name) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars(); // att o mapa pra versao mais recente
     		List<Car> deleteCars = searchCars(name);
 
@@ -151,7 +152,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     public List<Car> listCars() throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars(); // att o mapa pra versao mais recente
     		List<Car> list = new ArrayList<Car>();
     		
@@ -169,7 +170,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     public List<Car> listCars(int category) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars(); // att o mapa pra versao mais recente
     		List<Car> list = new ArrayList<Car>();
     		
@@ -190,7 +191,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     public Car searchCar(String renavam) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars(); // att o mapa pra versao mais recente
     		
     		Car finded = null;
@@ -207,7 +208,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     public List<Car> searchCars(String name) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars(); // att o mapa pra versao mais recente
     		
     		List<Car> findeds = new ArrayList<Car>();
@@ -224,7 +225,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     synchronized public Car buyCar(String renavam) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             Car purchased = searchCar(renavam);
             deleteCar(renavam);
             return purchased;	
@@ -234,7 +235,7 @@ public class DatabaseServer implements DatabaseInterface {
 
     @Override
     public int getAmount(int category) throws RemoteException {
-    	if(DatabaseServer.getPermission()) {
+    	if(getPermission(DatabaseServer::getPermissionLogic)) {
             cars = getFileCars();
     		//attServer();
     		
@@ -325,10 +326,12 @@ public class DatabaseServer implements DatabaseInterface {
 		return cars;
 	}
     
-    public static boolean getPermission() {
-		
+	public static boolean getPermission(PermissionCheck permissionCheck) {
+		return permissionCheck.checkPermission();
+	}
+
+	public static boolean getPermissionLogic() {
 		String sourceIp = "";
-		
 		
 		try {
 			sourceIp = RemoteServer.getClientHost();
@@ -348,5 +351,4 @@ public class DatabaseServer implements DatabaseInterface {
 			return false;
 		}
 	}
-    
 }

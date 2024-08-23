@@ -27,6 +27,7 @@ import model.User;
 import server.GatewayInterface;
 import server.storage.DatabaseInterface;
 import server.storage.StorageInterface;
+import java.util.concurrent.*;
 
 public class ProcessClient {
 	
@@ -35,10 +36,13 @@ public class ProcessClient {
 	static RSAKeys gatewayRSAKeys;
 	
 	private static boolean connected = false;
+	private static int timer = 60;
 	private static Scanner scan;
 	private static GatewayInterface gateway;
 	private static User connectedUser;
 	private static List<Car> myCars;
+
+	private static ScheduledExecutorService scheduler;
 	
 	// pra demonstração do firewall
 	private static StorageInterface storServer;
@@ -48,7 +52,7 @@ public class ProcessClient {
 	
 	public static void main(String[] args) {
 		
-		clientNumber = 2;
+		clientNumber = 0;
 		myKeys = new Keys();
 		scan = new Scanner(System.in);
 		myCars = new ArrayList<Car>();
@@ -77,233 +81,174 @@ public class ProcessClient {
 			gatewayRSAKeys = gateway.getRSAKeys();	// pega as do gateway
 			myKeys.getRsaKeys().setPrivateKey(myRsaKeys.getPrivateKey()); // agora sim add a chave privada dps de enviar pro gateway sem
 			
-			while(!connected) {
-				
-				System.out.println("\tAUTENTICAÇÃO");
-				System.out.println("------------------------");
-				System.out.println("[1] - Login");
-				System.out.println("[2] - Registrar-se");
-				System.out.println("------------------------");
-				System.out.print("Opção: ");
-				int opc = scan.nextInt();
-				scan.nextLine();
-				System.out.println("------------------------");
-				
-				switch(opc) {
-				case 1:
-					connectedUser = login();
-					if(connectedUser != null) {
-						connected = true;
-					} else {
-						ProcessClient.passwordTries--;
-						System.out.println("Login ou senha incorretos. " + ProcessClient.passwordTries + " tentativas restantes.");
-						if(ProcessClient.passwordTries == 0) {
-							System.out.println("Sistema bloqueado por 10 segundos.");
-							System.out.println("------------------------");
-							Thread.sleep(10000);
-							ProcessClient.passwordTries = 3;
-						}
+
+			scheduler = Executors.newScheduledThreadPool(1);
+
+			Runnable checkAFK = () -> {
+				if(connected) {
+					timer--;
+					if(timer <= 0) {
+						connected = false;
+						timer = 60;
 					}
-					break;
-				case 2:
-					register();
-					break;
-				default:
-					System.out.println("Opção inválida.");
-				} 
-				
-			}
-			
-			while(connected) {
-				System.out.println("------------------");
-				System.out.println("LOJA DE CARROS");
-				System.out.println("------------------");
-				System.out.println("[1] - Listar carros");
-				System.out.println("[2] - Pesquisar carro");
-				System.out.println("[3] - Comprar carro");
-				System.out.println("[4] - Ver quantidade de carros");
-				if(connectedUser.isEmployee()) {
-					System.out.println("[5] - Adicionar carro");
-					System.out.println("[6] - Alterar carro");
-					System.out.println("[7] - Excluir carro");
 				}
-				System.out.println("[0] - Carros comprados nessa ida à loja");
-				System.out.println("------------------");
-				System.out.print("Opção: ");
-				int opc = scan.nextInt();
-				scan.nextLine();
-				System.out.println("------------------");
+			};
+
+			scheduler.scheduleAtFixedRate(checkAFK, 0, 1, TimeUnit.SECONDS);
+			
+			while(true) {
+				while(!connected) {
 				
-				String msgEncrypted;
-				String hmac;
-				String signature;
-				String decryptedMsg;
-				String realHMAC;
-				boolean validSignature;
-				switch(opc) {
-				
-				case 1:
-					
-					System.out.println("\tLISTAGEM");
-					System.out.println("------------------");
-					System.out.println("[1] - Carros econômicos");
-					System.out.println("[2] - Carros intermediários");
-					System.out.println("[3] - Carros executivos");
-					System.out.println("[4] - Todos os tipos");
-					System.out.println("------------------");
+					System.out.println("\tAUTENTICAÇÃO");
+					System.out.println("------------------------");
+					System.out.println("[1] - Login");
+					System.out.println("[2] - Registrar-se");
+					System.out.println("------------------------");
 					System.out.print("Opção: ");
-					int listOpc = scan.nextInt();
+					int opc = scan.nextInt();
 					scan.nextLine();
+					System.out.println("------------------------");
 					
-					List<Car> cars = new ArrayList<Car>();
-					
-					Message<String> response;
-					switch(listOpc) {
+					switch(opc) {
 					case 1:
-					case 2:
-					case 3:	
-						//cars = gateway.listCars(listOpc);
-						hmac = Hasher.hMac(myKeys.getHMACKey(), String.valueOf(listOpc));
-						msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(listOpc));
-						signature = Encrypter.signMessage(myKeys, hmac);
-						
-						response = gateway.receiveMessage(new Message<String>(1, msgEncrypted, signature, clientNumber));
-						
-						decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-						realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-							
-						validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-						
-						if(validSignature) {
-							String stringCars[] = decryptedMsg.split("¬");
-							for(String stringCar : stringCars) {
-								if(stringCar != "") {
-									String partsCar[] = stringCar.split("°");
-									cars.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
-								}
-							}
+						connectedUser = login();
+						if(connectedUser != null) {
+							connected = true;
 						} else {
-							System.out.println("Assinatura incorreta. Servidor inválido.");
+							System.out.println("Login ou senha incorretos. " + ProcessClient.passwordTries + " tentativas restantes.");
+							ProcessClient.passwordTries--;
+							if(ProcessClient.passwordTries == 0) {
+								System.out.println("Sistema bloqueado por 10 segundos.");
+								System.out.println("------------------------");
+								Thread.sleep(10000);
+								ProcessClient.passwordTries = 3;
+							}
 						}
-						
 						break;
-					case 4:
-						//cars = gateway.listCars();
-						hmac = Hasher.hMac(myKeys.getHMACKey(), "put to pull");
-						msgEncrypted = Encrypter.fullEncrypt(myKeys, "put to pull");
-						signature = Encrypter.signMessage(myKeys, hmac);
-						
-						response = gateway.receiveMessage(new Message<String>(111, msgEncrypted, signature, clientNumber));	
-						
-						decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-						realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-							
-						validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-						
-						if(validSignature) {
-							String stringCars[] = decryptedMsg.split("¬");
-							for(String stringCar : stringCars) {
-								if(stringCar != "") {
-									String partsCar[] = stringCar.split("°");
-									cars.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
-								}
-							}
-						} else {
-							System.out.println("Assinatura incorreta. Servidor inválido.");
-						}
+					case 2:
+						register();
 						break;
 					default:
 						System.out.println("Opção inválida.");
-					}
+					} 
 					
-					for(Car car : cars) {
-						System.out.println("------------------");
-						System.out.println("Renavam: " + car.getRenavam());
-						System.out.println("Nome: " + car.getName());
-						System.out.println("Categoria: " + car.getStringCategory());
-						System.out.println("Ano de fabricação: " + car.getManufactureYear());
-						System.out.println("Preço: R$" + car.getPrice());
-					}
-					
-					break;
-				case 2:
-					
-					System.out.println("PESQUISA");
+				}
+
+				while(connected) {
 					System.out.println("------------------");
-					System.out.println("[1] - Renavam");
-					System.out.println("[2] - Nome");
+					System.out.println("LOJA DE CARROS");
+					System.out.println("------------------");
+					System.out.println("[1] - Listar carros");
+					System.out.println("[2] - Pesquisar carro");
+					System.out.println("[3] - Comprar carro");
+					System.out.println("[4] - Ver quantidade de carros");
+					if(connectedUser.isEmployee()) {
+						System.out.println("[5] - Adicionar carro");
+						System.out.println("[6] - Alterar carro");
+						System.out.println("[7] - Excluir carro");
+					}
+					System.out.println("[0] - Carros comprados nessa ida à loja");
 					System.out.println("------------------");
 					System.out.print("Opção: ");
-					int searchOpc = scan.nextInt();
+					int opc = 0;
+					if(connected)
+						opc = scan.nextInt();
+
 					scan.nextLine();
 					System.out.println("------------------");
 					
-					switch(searchOpc) {
+					String msgEncrypted;
+					String hmac;
+					String signature;
+					String decryptedMsg;
+					String realHMAC;
+					boolean validSignature;
+					switch(opc) {
 					case 1:
-						System.out.print("Digite o renavam: ");
-						String renavam = scan.nextLine();
+						timer = 60;
+
+						System.out.println("\tLISTAGEM");
+						System.out.println("------------------");
+						System.out.println("[1] - Carros econômicos");
+						System.out.println("[2] - Carros intermediários");
+						System.out.println("[3] - Carros executivos");
+						System.out.println("[4] - Todos os tipos");
+						System.out.println("------------------");
+						System.out.print("Opção: ");
+						int listOpc = 0;
+						if(connected)
+							listOpc = scan.nextInt();
+						scan.nextLine();
 						
-						//Car findedCar = gateway.searchCar(renavam);
+						List<Car> cars = new ArrayList<Car>();
 						
-						hmac = Hasher.hMac(myKeys.getHMACKey(), renavam);
-						msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
-						signature = Encrypter.signMessage(myKeys, hmac);
-						
-						response = gateway.receiveMessage(new Message<String>(2, msgEncrypted, signature, clientNumber));
-						
-						decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-						realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-							
-						validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-						
-						if(validSignature) {
-							String partsCar[] = decryptedMsg.split("°");
-							Car findedCar = new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4]));
-							
-							if(!findedCar.getName().equals("null")) {
-								System.out.println("------------------");
-								System.out.println("Renavam: " + findedCar.getRenavam());
-								System.out.println("Nome: " + findedCar.getName());
-								System.out.println("Categoria: " + findedCar.getStringCategory());
-								System.out.println("Ano de fabricação: " + findedCar.getManufactureYear());
-								System.out.println("Preço: R$" + findedCar.getPrice());
-							} else {
-								System.out.println("Carro não encontrado.");
-							}
-							
-						} else {
-							System.out.println("Assinatura incorreta. Servidor inválido.");
+						Message<String> response;
+						switch(listOpc) {
+							case 1:
+							case 2:
+							case 3:	
+								//cars = gateway.listCars(listOpc);
+								timer = 60;
+								if(connected) {
+									hmac = Hasher.hMac(myKeys.getHMACKey(), String.valueOf(listOpc));
+									msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(listOpc));
+									signature = Encrypter.signMessage(myKeys, hmac);
+									
+									response = gateway.receiveMessage(new Message<String>(1, msgEncrypted, signature, clientNumber));
+									
+									decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+									realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+										
+									validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+									
+									if(validSignature) {
+										String stringCars[] = decryptedMsg.split("¬");
+										for(String stringCar : stringCars) {
+											if(stringCar != "") {
+												String partsCar[] = stringCar.split("°");
+												cars.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
+											}
+										}
+									} else {
+										System.out.println("Assinatura incorreta. Servidor inválido.");
+									}
+								}
+							break;
+							case 4:
+								timer = 60;
+
+								//cars = gateway.listCars();
+								if(connected) {
+									hmac = Hasher.hMac(myKeys.getHMACKey(), "put to pull");
+									msgEncrypted = Encrypter.fullEncrypt(myKeys, "put to pull");
+									signature = Encrypter.signMessage(myKeys, hmac);
+									
+									response = gateway.receiveMessage(new Message<String>(111, msgEncrypted, signature, clientNumber));	
+									
+									decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+									realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+										
+									validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+									
+									if(validSignature) {
+										String stringCars[] = decryptedMsg.split("¬");
+										for(String stringCar : stringCars) {
+											if(stringCar != "") {
+												String partsCar[] = stringCar.split("°");
+												cars.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
+											}
+										}
+									} else {
+										System.out.println("Assinatura incorreta. Servidor inválido.");
+									}
+								}
+							break;
+							case 0: break;
+							default: System.out.println("Opção inválida."); break;
 						}
 						
-						break;
-					case 2:
-						System.out.print("Digite o nome: ");
-						String name = scan.nextLine();
-						
-						//List<Car> findedsCar = gateway.searchCars(name);
-
-						hmac = Hasher.hMac(myKeys.getHMACKey(), name);
-						msgEncrypted = Encrypter.fullEncrypt(myKeys, name);
-						signature = Encrypter.signMessage(myKeys, hmac);
-						
-						response = gateway.receiveMessage(new Message<String>(222, msgEncrypted, signature, clientNumber));
-						
-						decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-						realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-							
-						validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-						
-						if(validSignature) {
-							String stringCars[] = decryptedMsg.split("¬");
-							List<Car> findedsCar = new ArrayList<Car>();
-							for(String stringCar : stringCars) {
-								if(stringCar != "") {
-									String partsCar[] = stringCar.split("°");
-									findedsCar.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
-								}
-							}
-							
-							for(Car car : findedsCar) {
+						if(connected) {
+							for(Car car : cars) {
 								System.out.println("------------------");
 								System.out.println("Renavam: " + car.getRenavam());
 								System.out.println("Nome: " + car.getName());
@@ -311,95 +256,205 @@ public class ProcessClient {
 								System.out.println("Ano de fabricação: " + car.getManufactureYear());
 								System.out.println("Preço: R$" + car.getPrice());
 							}
-						} else {
-							System.out.println("Assinatura incorreta. Servidor inválido.");
 						}
- 
+						break;
+					case 2:
+						timer = 60;
+
+						System.out.println("PESQUISA");
+						System.out.println("------------------");
+						System.out.println("[1] - Renavam");
+						System.out.println("[2] - Nome");
+						System.out.println("------------------");
+						System.out.print("Opção: ");
+						int searchOpc = 0;
+						if(connected)
+							searchOpc = scan.nextInt();
+						scan.nextLine();
+						System.out.println("------------------");
+						
+						switch(searchOpc) {
+						case 1:
+							timer = 60;
+
+							System.out.print("Digite o renavam: ");
+							String renavam = null;
+							if(connected)
+								renavam = scan.nextLine();
+							
+							//Car findedCar = gateway.searchCar(renavam);
+							
+							if(connected) {
+								hmac = Hasher.hMac(myKeys.getHMACKey(), renavam);
+								msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
+								signature = Encrypter.signMessage(myKeys, hmac);
+								
+								response = gateway.receiveMessage(new Message<String>(2, msgEncrypted, signature, clientNumber));
+								
+								decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+								realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+									
+								validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+								
+								if(validSignature) {
+									String partsCar[] = decryptedMsg.split("°");
+									Car findedCar = new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4]));
+									
+									if(!findedCar.getName().equals("null")) {
+										System.out.println("------------------");
+										System.out.println("Renavam: " + findedCar.getRenavam());
+										System.out.println("Nome: " + findedCar.getName());
+										System.out.println("Categoria: " + findedCar.getStringCategory());
+										System.out.println("Ano de fabricação: " + findedCar.getManufactureYear());
+										System.out.println("Preço: R$" + findedCar.getPrice());
+									} else {
+										System.out.println("Carro não encontrado.");
+									}
+									
+								} else {
+									System.out.println("Assinatura incorreta. Servidor inválido.");
+								}
+							}
+							break;
+						case 2:
+							timer = 60;
+
+							System.out.print("Digite o nome: ");
+							String name = null;
+							if(connected)
+								name = scan.nextLine();
+							
+							//List<Car> findedsCar = gateway.searchCars(name);
+							if(connected) {
+								hmac = Hasher.hMac(myKeys.getHMACKey(), name);
+								msgEncrypted = Encrypter.fullEncrypt(myKeys, name);
+								signature = Encrypter.signMessage(myKeys, hmac);
+								
+								response = gateway.receiveMessage(new Message<String>(222, msgEncrypted, signature, clientNumber));
+								
+								decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+								realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+									
+								validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+								
+								if(validSignature) {
+									String stringCars[] = decryptedMsg.split("¬");
+									List<Car> findedsCar = new ArrayList<Car>();
+									for(String stringCar : stringCars) {
+										if(stringCar != "") {
+											String partsCar[] = stringCar.split("°");
+											findedsCar.add(new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4])));
+										}
+									}
+									
+									for(Car car : findedsCar) {
+										System.out.println("------------------");
+										System.out.println("Renavam: " + car.getRenavam());
+										System.out.println("Nome: " + car.getName());
+										System.out.println("Categoria: " + car.getStringCategory());
+										System.out.println("Ano de fabricação: " + car.getManufactureYear());
+										System.out.println("Preço: R$" + car.getPrice());
+									}
+								} else {
+									System.out.println("Assinatura incorreta. Servidor inválido.");
+								}
+							}
+							break;
+						default:
+							System.out.println("Opção inválida.");
+						}
+						
+						break;
+					case 3:
+						timer = 60;
+						if(connected)
+							buyCar();
+						break;
+					case 4:
+						timer = 60;
+
+						System.out.println("[1] - Econômico");
+						System.out.println("[2] - Intermediário");
+						System.out.println("[3] - Executivo");
+						System.out.println("[4] - Todas as categorias");
+						System.out.println("--------------------");
+						System.out.print("Categoria: ");
+						int category = 0;
+						if(connected) {
+							category = scan.nextInt();
+						}
+						
+						//int amount = gateway.getAmount(category);
+						hmac = Hasher.hMac(myKeys.getHMACKey(), String.valueOf(category));
+						msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(category));
+						signature = Encrypter.signMessage(myKeys, hmac);
+						
+						response = gateway.receiveMessage(new Message<String>(4, msgEncrypted, signature, clientNumber));
+						
+						decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+						realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+							
+						validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+						
+						if(validSignature) {
+							int amount = Integer.parseInt(decryptedMsg);
+							
+							System.out.println("--------------------");
+							System.out.println("Quantidade de carros na loja: " + amount);
+						}
+						
+						break;
+					case 5:
+						timer = 60;
+						if(connectedUser.isEmployee() && connected) {
+							addCar();
+						}
+						
+						break;
+					case 6:
+						timer = 60;
+						if(connectedUser.isEmployee() && connected) {
+							editCar();
+						}
+						
+						break;
+					case 7:
+						timer = 60;
+						if(connectedUser.isEmployee() && connected) {
+							deleteCar();
+						}
+						
+						break;
+					case 0:
+						timer = 60;
+						System.out.println("--------------------");
+						System.out.println("CARROS COMPRADOS");
+						for(Car purchased : myCars) {
+							System.out.println("--------------------");
+							System.out.println("Renavam: " + purchased.getRenavam());
+							System.out.println("Nome: " + purchased.getName());
+							System.out.println("Categoria: " + purchased.getStringCategory());
+							System.out.println("Ano de fabricação: " + purchased.getManufactureYear());
+							System.out.println("Preço: R$" + purchased.getPrice());
+						}
+						
+						break;
+					case 4545:
+						gateway.putToSleep();
+						
+						break;
+					case 5454:
+						tryAcessStorage();
+						break;
+					case 5555:
+						tryAcessDatabase();
 						break;
 					default:
 						System.out.println("Opção inválida.");
+					
 					}
 					
-					break;
-				case 3:
-					buyCar();
-					
-					break;
-				case 4:
-					System.out.println("[1] - Econômico");
-					System.out.println("[2] - Intermediário");
-					System.out.println("[3] - Executivo");
-					System.out.println("[4] - Todas as categorias");
-					System.out.println("--------------------");
-					System.out.print("Categoria: ");
-					int category = scan.nextInt();
-					
-					//int amount = gateway.getAmount(category);
-					hmac = Hasher.hMac(myKeys.getHMACKey(), String.valueOf(category));
-					msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(category));
-					signature = Encrypter.signMessage(myKeys, hmac);
-					
-					response = gateway.receiveMessage(new Message<String>(4, msgEncrypted, signature, clientNumber));
-					
-					decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-					realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-						
-					validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-					
-					if(validSignature) {
-						int amount = Integer.parseInt(decryptedMsg);
-						
-						System.out.println("--------------------");
-						System.out.println("Quantidade de carros na loja: " + amount);
-					}
-					
-					break;
-				case 5:
-					if(connectedUser.isEmployee()) {
-						addCar();
-					}
-					
-					break;
-				case 6:
-					if(connectedUser.isEmployee()) {
-						editCar();
-					}
-					
-					break;
-				case 7:
-					if(connectedUser.isEmployee()) {
-						deleteCar();
-					}
-					
-					break;
-				case 0:
-					System.out.println("--------------------");
-					System.out.println("CARROS COMPRADOS");
-					for(Car purchased : myCars) {
-						System.out.println("--------------------");
-						System.out.println("Renavam: " + purchased.getRenavam());
-						System.out.println("Nome: " + purchased.getName());
-						System.out.println("Categoria: " + purchased.getStringCategory());
-						System.out.println("Ano de fabricação: " + purchased.getManufactureYear());
-						System.out.println("Preço: R$" + purchased.getPrice());
-					}
-					
-					break;
-				case 4545:
-					gateway.putToSleep();
-					
-					break;
-				case 5454:
-					tryAcessStorage();
-					break;
-				case 5555:
-					tryAcessDatabase();
-					break;
-				default:
-					System.out.println("Opção inválida.");
-				
 				}
-				
 			}
 			
 		} catch (RemoteException | NotBoundException | InvalidKeyException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
@@ -615,71 +670,76 @@ public class ProcessClient {
 		System.out.println("COMPRA DE CARRO");
 		System.out.println("------------------");
 		System.out.print("Renavam do carro:");
-		String renavamToBuy = scan.nextLine();
+		String renavamToBuy = null;
+		if(connected)
+			renavamToBuy = scan.nextLine();
 		//Car buyCar = gateway.searchCar(renavamToBuy);
 		
-		String hmac = Hasher.hMac(myKeys.getHMACKey(), renavamToBuy);
-		String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavamToBuy);
-		String signature = Encrypter.signMessage(myKeys, hmac);
-		
-		Message<String> response = gateway.receiveMessage(new Message<String>(2000, msgEncrypted, signature, clientNumber));
-		
-		String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-		String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+		if(connected) {
+			String hmac = Hasher.hMac(myKeys.getHMACKey(), renavamToBuy);
+			String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavamToBuy);
+			String signature = Encrypter.signMessage(myKeys, hmac);
 			
-		boolean validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-		
-		if(validSignature) {
-			String partsCar[] = decryptedMsg.split("°");
-			Car buyCar = new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4]));
-		
-			System.out.println("Nome: " + buyCar.getName());
-			System.out.println("Categoria: " + buyCar.getStringCategory());
-			System.out.println("Ano de fabricação: " + buyCar.getManufactureYear());
-			System.out.println("Preço: R$" + buyCar.getPrice());
-			System.out.println("------------------");
-			System.out.print("Confirmar compra? (S/N)");
-			String confirm = scan.nextLine();
+			Message<String> response = gateway.receiveMessage(new Message<String>(2, msgEncrypted, signature, clientNumber));
 			
-			switch(confirm.charAt(0)) {
-			case 'Y':
-			case 'y':
-			case 'S':
-			case 's':
-				//Car purchased = gateway.buyCar(renavamToBuy);
-				response = gateway.receiveMessage(new Message<String>(3, msgEncrypted, signature, clientNumber));
+			String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+			String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
 				
-				decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
-				realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
-				
-				validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
-				
-				if(validSignature) {
-					String partsCar2[] = decryptedMsg.split("°");
-					Car purchased = new Car(partsCar2[0], partsCar2[1], Integer.parseInt(partsCar2[2]), partsCar2[3], Double.parseDouble(partsCar2[4]));
 
-					if(!purchased.getName().equals("null")) {
-						System.out.println("Compra efetuada com sucesso.");
-						System.out.println("Carro: " + purchased.getRenavam());
-						myCars.add(purchased);
-					} else {
-						System.out.println("------------------");
-						System.out.println("Já compraram esse carro enquanto você pensava.");
-					}	
-				} else {
-					System.out.println("Assinatura incorreta. Servidor inválido.");
-				}
+			boolean validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+			
+			if(validSignature) {
+				String partsCar[] = decryptedMsg.split("°");
+				Car buyCar = new Car(partsCar[0], partsCar[1], Integer.parseInt(partsCar[2]), partsCar[3], Double.parseDouble(partsCar[4]));
+			
+				System.out.println("Nome: " + buyCar.getName());
+				System.out.println("Categoria: " + buyCar.getStringCategory());
+				System.out.println("Ano de fabricação: " + buyCar.getManufactureYear());
+				System.out.println("Preço: R$" + buyCar.getPrice());
+				System.out.println("------------------");
+				System.out.print("Confirmar compra? (S/N)");
+				String confirm = scan.nextLine();
 				
-				break;
-			case 'N':
-			case 'n':
-				System.out.println("Compra cancelada.");
-				break;
-			default:
-				System.out.println("Opção inválida. Compra cancelada.");
+				switch(confirm.charAt(0)) {
+				case 'Y':
+				case 'y':
+				case 'S':
+				case 's':
+					//Car purchased = gateway.buyCar(renavamToBuy);
+					response = gateway.receiveMessage(new Message<String>(3, msgEncrypted, signature, clientNumber));
+					
+					decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
+					realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
+						
+					validSignature = Encrypter.verifySignature(gatewayRSAKeys, realHMAC, response.getMessageSignature());
+					
+					if(validSignature) {
+						String partsCar2[] = decryptedMsg.split("°");
+						Car purchased = new Car(partsCar2[0], partsCar2[1], Integer.parseInt(partsCar2[2]), partsCar2[3], Double.parseDouble(partsCar2[4]));
+
+						if(!purchased.getName().equals("null")) {
+							System.out.println("Compra efetuada com sucesso.");
+							System.out.println("Carro: " + purchased.getRenavam());
+							myCars.add(purchased);
+						} else {
+							System.out.println("------------------");
+							System.out.println("Já compraram esse carro enquanto você pensava.");
+						}	
+					} else {
+						System.out.println("Assinatura incorreta. Servidor inválido.");
+					}
+					
+					break;
+				case 'N':
+				case 'n':
+					System.out.println("Compra cancelada.");
+					break;
+				default:
+					System.out.println("Opção inválida. Compra cancelada.");
+				}
+			} else {
+				System.out.println("Assinatura incorreta. Servidor inválido.");
 			}
-		} else {
-			System.out.println("Assinatura incorreta. Servidor inválido.");
 		}
 	}
 	
