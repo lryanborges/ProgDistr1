@@ -66,15 +66,15 @@ public class ProcessClient {
 		myKeys.setRsaKeys(new RSAKeys(myRsaKeys.getPublicKey(), myRsaKeys.getnMod()));
 		
 		try {
-			Registry gatRegister = LocateRegistry.getRegistry("10.215.34.156", 5000);
+			Registry gatRegister = LocateRegistry.getRegistry("192.168.23.218", 5000);
 			gateway = (GatewayInterface) gatRegister.lookup("Gateway");
 			
 			// pra demonstração do firewall
-			Registry storRegister = LocateRegistry.getRegistry("10.215.34.156", 5002);
+			Registry storRegister = LocateRegistry.getRegistry("192.168.23.218", 5002);
 			storServer = (StorageInterface) storRegister.lookup("Storage0");
 			
 			// pra demonstração do firewall
-			Registry dataRegister = LocateRegistry.getRegistry("10.215.34.156", 5010);
+			Registry dataRegister = LocateRegistry.getRegistry("192.168.23.218", 5010);
 			dataServer = (DatabaseInterface) dataRegister.lookup("Database1");
 			
 			gateway.addNewClientKeys(clientNumber, myKeys); // manda suas chaves pro server
@@ -90,7 +90,7 @@ public class ProcessClient {
 					if(timer <= 0) {
 						connected = false;
 						timer = 60;
-						System.out.println("------------------");
+						System.out.println("\n------------------");
 						System.out.println("Você foi desconectado por inatividade.");
 						System.out.println("------------------");
 						

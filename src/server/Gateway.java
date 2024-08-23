@@ -55,7 +55,7 @@ public class Gateway implements GatewayInterface {
 	
 	private static List<Permission> permissions;
 	
-	BalancingStrategy strategy = BalancingStrategy.HASHING;
+	static BalancingStrategy strategy = BalancingStrategy.HASHING;
 	static StorageInterface leastStorageServer;
 	static int indexRR = 0;
 	// ips fake pra exemplificação do consistent hashing
@@ -123,9 +123,12 @@ public class Gateway implements GatewayInterface {
 			e.printStackTrace();
 		}
 		
-		for(StorageInterface store : stores) {
-			addStorageServer(store.getIpServer());
+		if(strategy == BalancingStrategy.HASHING) {
+			for(StorageInterface store : stores) {
+				addStorageServer(store.getIpServer());
+			}
 		}
+		
 		
 	}
 
@@ -156,6 +159,8 @@ public class Gateway implements GatewayInterface {
 	public void addCar(Car newCar) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.LEADER) {
+				storServer = store;
+				currentStorKeys = storageKeys.get(storServer);
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), newCar.toString());
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, newCar.toString());
 				String signature = Encrypter.signMessage(myKeys, hmac);
@@ -189,6 +194,8 @@ public class Gateway implements GatewayInterface {
 	public void editCar(String renavam, Car editedCar) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.LEADER) {
+				storServer = store;
+				currentStorKeys = storageKeys.get(storServer);
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), editedCar.toString());
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, editedCar.toString());
 				String signature = Encrypter.signMessage(myKeys, hmac);
@@ -222,6 +229,8 @@ public class Gateway implements GatewayInterface {
 	public void deleteCar(String renavam) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.LEADER) {
+				storServer = store;
+				currentStorKeys = storageKeys.get(storServer);
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), renavam);
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
 				String signature = Encrypter.signMessage(myKeys, hmac);
@@ -254,6 +263,8 @@ public class Gateway implements GatewayInterface {
 	public void deleteCars(String name) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.LEADER) {
+				storServer = store;
+				currentStorKeys = storageKeys.get(storServer);
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), name);
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, name);
 				String signature = Encrypter.signMessage(myKeys, hmac);
@@ -310,7 +321,6 @@ public class Gateway implements GatewayInterface {
 					if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
 						leastStorageServer = store;
 						currentStorKeys = storageKeys.get(leastStorageServer);
-						break;
 					}
 				}
 				
@@ -640,6 +650,8 @@ public class Gateway implements GatewayInterface {
 	public Car buyCar(String renavam) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.LEADER) {
+				storServer = store;
+				currentStorKeys = storageKeys.get(storServer);
 				System.out.println("Carro de renavam " + renavam + " foi comprado.");
 
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), renavam);
@@ -962,9 +974,9 @@ public class Gateway implements GatewayInterface {
 		// ryan client
 		permitAccess.permit("192.168.144.218");
 		// ryan client 22/08/2024
-		permitAccess.permit("10.215.34.156");
+		permitAccess.permit("192.168.23.218");
 		// vinicius client 22/08/2024
-		permitAccess.permit("192.168.76.112");
+		permitAccess.permit("192.168.23.112");
 
 	}
 	
