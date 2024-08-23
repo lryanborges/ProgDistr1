@@ -1,11 +1,11 @@
 package server;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -15,12 +15,14 @@ import java.rmi.server.ServerNotActiveException;
 import java.rmi.server.UnicastRemoteObject;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Random;
+import java.util.stream.IntStream;
 
 import crypto.Encrypter;
 import crypto.Hasher;
@@ -55,11 +57,16 @@ public class Gateway implements GatewayInterface {
 	
 	private static List<Permission> permissions;
 	
-	static ExecutorService executor;
+	BalancingStrategy strategy = BalancingStrategy.HASHING;
+	static StorageInterface leastStorageServer;
+	static int indexRR = 0;
+	// ips fake pra exemplificação do consistent hashing
+							//  40.180.45.45 | 26.95.199.60 |40.180.45.45 |192.168.10.222 | 192.168.10.222 | 26.95.199.60
+	static String[] ipClient = {"76.76.40.25", "192.0.2.44", "203.0.113.2", "25.102.140.11", "198.51.100.24", "26.95.199.60" };
+	static Map<BigInteger, String> serverMap = new HashMap<>();
+    static List<BigInteger> sortedHashes = new ArrayList<>();
 	
-	public static void main(String[] args) {
-		
-		executor = Executors.newSingleThreadExecutor();
+	public static void main(String[] args) throws RemoteException {
 		
 		Gateway gateway = new Gateway();
 		stores = new ArrayList<>();
@@ -116,6 +123,10 @@ public class Gateway implements GatewayInterface {
 			
 		} catch (RemoteException | NotBoundException e) {
 			e.printStackTrace();
+		}
+		
+		for(StorageInterface store : stores) {
+			addStorageServer(store.getIpServer());
 		}
 		
 	}
@@ -234,7 +245,53 @@ public class Gateway implements GatewayInterface {
 			String msgEncrypted = Encrypter.fullEncrypt(myKeys, "push to pull");
 			String signature = Encrypter.signMessage(myKeys, hmac);
 			
-			Message<String> response = storServer.receiveMessage(new Message<String>(111, msgEncrypted, signature));
+			Message<String> response;
+			
+			if(strategy == BalancingStrategy.WLC) {
+				leastStorageServer = storServer;
+				currentStorKeys = storageKeys.get(leastStorageServer);
+				
+				// balanceamento de carga vai mudar de quem o gateway recebe mensagem
+				for(StorageInterface store : stores) {
+					if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
+						leastStorageServer = store;
+						currentStorKeys = storageKeys.get(leastStorageServer);
+						break;
+					}
+				}
+				
+				response = leastStorageServer.receiveMessage(new Message<String>(111, msgEncrypted, signature));
+				leastStorageServer.incrementConnectionNumber();
+			} else if (strategy == BalancingStrategy.HASHING) {
+				SecureRandom rd = new SecureRandom();
+				int ind = rd.nextInt(6);
+				
+				System.out.println("--------------------------------");
+				System.out.println("IP que está solicitando: " + ipClient[ind]);
+				String unhashedServer = getServer(ipClient[ind]);
+				
+				for(StorageInterface store : stores) {
+					if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
+						System.out.println("oewww");
+						System.out.println("Vai pro server: " + store.getIpServer());
+						System.out.println("--------------------------------");
+						storServer = store;
+						
+					}
+				}
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(111, msgEncrypted, signature));
+			} else { // Rouding Robin
+				storServer = stores.get(indexRR);
+				indexRR = (indexRR + 1) % 3;
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(111, msgEncrypted, signature));
+				storServer.incrementRR();
+			}
+			
+			//Message<String> response = storServer.receiveMessage(new Message<String>(111, msgEncrypted, signature));
 			
 			String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 			String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
@@ -276,8 +333,53 @@ public class Gateway implements GatewayInterface {
 			String hmac = Hasher.hMac(myKeys.getHMACKey(), String.valueOf(category));
 			String msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(category));
 			String signature = Encrypter.signMessage(myKeys, hmac);
+
+			Message<String> response;
+			if(strategy == BalancingStrategy.WLC) {
+				leastStorageServer = storServer;
+				currentStorKeys = storageKeys.get(leastStorageServer);
+				
+				// balanceamento de carga vai mudar de quem o gateway recebe mensagem
+				for(StorageInterface store : stores) {
+					if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
+						leastStorageServer = store;
+						currentStorKeys = storageKeys.get(leastStorageServer);
+						break;
+					}
+				}
+				
+				response = leastStorageServer.receiveMessage(new Message<String>(1, msgEncrypted, signature));
+				leastStorageServer.incrementConnectionNumber();
+			} else if (strategy == BalancingStrategy.HASHING) {
+				SecureRandom rd = new SecureRandom();
+				int ind = rd.nextInt(6);
+				
+				System.out.println("--------------------------------");
+				System.out.println("IP que está solicitando: " + ipClient[ind]);
+				String unhashedServer = getServer(ipClient[ind]);
+				
+				for(StorageInterface store : stores) {
+					if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
+						System.out.println("oewww");
+						System.out.println("Vai pro server: " + store.getIpServer());
+						System.out.println("--------------------------------");
+						storServer = store;
+						
+					}
+				}
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(1, msgEncrypted, signature));
+			} else { // Rouding Robin
+				storServer = stores.get(indexRR);
+				indexRR = (indexRR + 1) % 3;
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(1, msgEncrypted, signature));
+				storServer.incrementRR();
+			}
 			
-			Message<String> response = storServer.receiveMessage(new Message<String>(1, msgEncrypted, signature));
+			//Message<String> response = storServer.receiveMessage(new Message<String>(1, msgEncrypted, signature));
 			
 			String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 			String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
@@ -298,13 +400,13 @@ public class Gateway implements GatewayInterface {
 			} else {
 				System.out.println("Assinatura incorreta. Servidor inválido.");
 			}
-		}
+		} 
 		storServer = storServer.startElections();
 		currentStorKeys = storageKeys.get(storServer);
 		return this.listCars(category);
 	}
 	
-	public Car searchCar(String renavam) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
+	public Car searchCar(String renavam, boolean buy) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
 		boolean leaderOn = true;
 		for(StorageInterface store : stores) {
 			if(store.getRole() == ServerRole.OUTOFORDER) {
@@ -319,7 +421,57 @@ public class Gateway implements GatewayInterface {
 			String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
 			String signature = Encrypter.signMessage(myKeys, hmac);
 			
-			Message<String> response = storServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
+			Message<String> response;
+			if(!buy) { // se nao for pra compra, ele alterna
+				if(strategy == BalancingStrategy.WLC) {
+					leastStorageServer = storServer;
+					currentStorKeys = storageKeys.get(leastStorageServer);
+					
+					// balanceamento de carga vai mudar de quem o gateway recebe mensagem
+					for(StorageInterface store : stores) {
+						if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
+							leastStorageServer = store;
+							currentStorKeys = storageKeys.get(leastStorageServer);
+							break;
+						}
+					}
+					
+					response = leastStorageServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
+					leastStorageServer.incrementConnectionNumber();
+				} else if (strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					String unhashedServer = getServer(ipClient[ind]);
+					
+					for(StorageInterface store : stores) {
+						if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
+							System.out.println("oewww");
+							System.out.println("Vai pro server: " + store.getIpServer());
+							System.out.println("--------------------------------");
+							storServer = store;
+							
+						}
+					}
+					currentStorKeys = storageKeys.get(storServer);
+					
+					response = storServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
+				} else { // Rouding Robin
+					storServer = stores.get(indexRR);
+					indexRR = (indexRR + 1) % 3;
+					currentStorKeys = storageKeys.get(storServer);
+					
+					response = storServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
+					storServer.incrementRR();
+				}
+			} else {
+				response = storServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
+			}
+			
+			
+			//Message<String> response = storServer.receiveMessage(new Message<String>(2, msgEncrypted, signature));
 			
 			String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 			String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
@@ -342,7 +494,7 @@ public class Gateway implements GatewayInterface {
 		}
 		storServer = storServer.startElections();
 		currentStorKeys = storageKeys.get(storServer);
-		return this.searchCar(renavam);
+		return this.searchCar(renavam, false);
 	}
 
 	public List<Car> searchCars(String name) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, UnsupportedEncodingException {
@@ -360,7 +512,52 @@ public class Gateway implements GatewayInterface {
 			String msgEncrypted = Encrypter.fullEncrypt(myKeys, name);
 			String signature = Encrypter.signMessage(myKeys, hmac);
 			
-			Message<String> response = storServer.receiveMessage(new Message<String>(222, msgEncrypted, signature));
+			Message<String> response;
+			if(strategy == BalancingStrategy.WLC) {
+				leastStorageServer = storServer;
+				currentStorKeys = storageKeys.get(leastStorageServer);
+				
+				// balanceamento de carga vai mudar de quem o gateway recebe mensagem
+				for(StorageInterface store : stores) {
+					if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
+						leastStorageServer = store;
+						currentStorKeys = storageKeys.get(leastStorageServer);
+						break;
+					}
+				}
+				
+				response = leastStorageServer.receiveMessage(new Message<String>(222, msgEncrypted, signature));
+				leastStorageServer.incrementConnectionNumber();
+			} else if (strategy == BalancingStrategy.HASHING) {
+				SecureRandom rd = new SecureRandom();
+				int ind = rd.nextInt(6);
+				
+				System.out.println("--------------------------------");
+				System.out.println("IP que está solicitando: " + ipClient[ind]);
+				String unhashedServer = getServer(ipClient[ind]);
+				
+				for(StorageInterface store : stores) {
+					if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
+						System.out.println("oewww");
+						System.out.println("Vai pro server: " + store.getIpServer());
+						System.out.println("--------------------------------");
+						storServer = store;
+						
+					}
+				}
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(222, msgEncrypted, signature));
+			} else { // Rouding Robin
+				storServer = stores.get(indexRR);
+				indexRR = (indexRR + 1) % 3;
+				currentStorKeys = storageKeys.get(storServer);
+				
+				response = storServer.receiveMessage(new Message<String>(222, msgEncrypted, signature));
+				storServer.incrementRR();
+			}
+			
+			//Message<String> response = storServer.receiveMessage(new Message<String>(222, msgEncrypted, signature));
 
 			String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
 			String realHMAC = Hasher.hMac(myKeys.getHMACKey(), decryptedMsg);
@@ -431,7 +628,53 @@ public class Gateway implements GatewayInterface {
 		String msgEncrypted = Encrypter.fullEncrypt(myKeys, String.valueOf(category));
 		String signature = Encrypter.signMessage(myKeys, hmac);
 		
-		Message<String> response = storServer.receiveMessage(new Message<String>(4, msgEncrypted, signature));
+		Message<String> response;
+		if(strategy == BalancingStrategy.WLC) {
+			leastStorageServer = storServer;
+			currentStorKeys = storageKeys.get(leastStorageServer);
+			
+			// balanceamento de carga vai mudar de quem o gateway recebe mensagem
+			for(StorageInterface store : stores) {
+				if(store.getConnectionNumber() < leastStorageServer.getConnectionNumber() && store.getConnectionWeight() != leastStorageServer.getConnectionWeight()) {
+					leastStorageServer = store;
+					currentStorKeys = storageKeys.get(leastStorageServer);
+					break;
+				}
+			}
+			
+			response = leastStorageServer.receiveMessage(new Message<String>(4, msgEncrypted, signature));
+			leastStorageServer.incrementConnectionNumber();
+		} else if (strategy == BalancingStrategy.HASHING) {
+			SecureRandom rd = new SecureRandom();
+			int ind = rd.nextInt(6);
+			
+			System.out.println("--------------------------------");
+			System.out.println("IP que está solicitando: " + ipClient[ind]);
+			String unhashedServer = getServer(ipClient[ind]);
+			
+			for(StorageInterface store : stores) {
+				if(Hasher.hashIp(store.getIpServer()).equals(Hasher.hashIp(unhashedServer))) {
+					System.out.println("oewww");
+					System.out.println("Vai pro server: " + store.getIpServer());
+					System.out.println("--------------------------------");
+					storServer = store;
+					
+				}
+			}
+			currentStorKeys = storageKeys.get(storServer);
+			
+			
+			response = storServer.receiveMessage(new Message<String>(4, msgEncrypted, signature));
+		} else { // Rouding Robin
+			storServer = stores.get(indexRR);
+			indexRR = (indexRR + 1) % 3;
+			currentStorKeys = storageKeys.get(storServer);
+			
+			response = storServer.receiveMessage(new Message<String>(4, msgEncrypted, signature));
+			storServer.incrementRR();
+		}
+		
+		//Message<String> response = storServer.receiveMessage(new Message<String>(4, msgEncrypted, signature));
 		//int amount = responseInt.getContent();
 		
 		String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
@@ -516,10 +759,18 @@ public class Gateway implements GatewayInterface {
 							
 							return new Message<String>(111, msgEncrypted, signature);
 						case 2:
-							Car response3 = this.searchCar(decryptedMsg);
+							Car response3 = this.searchCar(decryptedMsg, false);
 							
 							hmac = Hasher.hMac(currentClient.getHMACKey(), response3.toString());
 							msgEncrypted = Encrypter.fullEncrypt(currentClient, response3.toString());
+							signature = Encrypter.signMessage(myKeys, hmac);
+							
+							return new Message<String>(2, msgEncrypted, signature);
+						case 2000: // case específico para pesquisar nem alterar o balanceamento
+							Car response2000 = this.searchCar(decryptedMsg, true);
+							
+							hmac = Hasher.hMac(currentClient.getHMACKey(), response2000.toString());
+							msgEncrypted = Encrypter.fullEncrypt(currentClient, response2000.toString());
 							signature = Encrypter.signMessage(myKeys, hmac);
 							
 							return new Message<String>(2, msgEncrypted, signature);
@@ -649,6 +900,7 @@ public class Gateway implements GatewayInterface {
 		permitAccess.permit("10.215.34.249");
 		// vinicius client 22/08/2024
 		permitAccess.permit("26.15.5.193");
+
 	}
 	
 	private static String getIp() {
@@ -683,5 +935,34 @@ public class Gateway implements GatewayInterface {
 
         return ip;
     }
+	
+	private static void addStorageServer(String server) {
+        BigInteger hash = Hasher.hashIp(server);
+        serverMap.put(hash, server);
+        sortedHashes.add(hash);
+        Collections.sort(sortedHashes);
+    }
+
+    private static void removeStorageServer(String server) {
+        BigInteger hash = Hasher.hashIp(server);
+        serverMap.remove(hash);
+        sortedHashes.remove(hash);
+    }
+    
+    private static String getServer(String ip) {
+        BigInteger hash = Hasher.hashIp(ip);
+        int index = Collections.binarySearch(sortedHashes, hash);
+
+        if (index < 0) {
+            index = -index - 1;
+        }
+
+        if (index >= sortedHashes.size()) {
+            index = 0;
+        }
+
+        return serverMap.get(sortedHashes.get(index));
+    }
+
 	
 }

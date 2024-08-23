@@ -1,7 +1,9 @@
 package crypto;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.Mac;
@@ -33,5 +35,15 @@ public class Hasher {
 		
 		return stringBuilder.toString();
 	}
+	
+	public static BigInteger hashIp(String key) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(key.getBytes());
+            return new BigInteger(1, hashBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
 	
 }

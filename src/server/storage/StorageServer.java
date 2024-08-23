@@ -49,13 +49,18 @@ public class StorageServer implements StorageInterface {
 	
 	private static Permission gatewayPermission;
 	private static Permission backdoorPermission;
-	
-	private static String ipGateway = "26.15.5.193";
-	
+
+	private static String ipGateway = "192.168.1.4";
+  
 	private static ExecutorService executor;
 	private static int connectionWeight = 0;
+	private static int connectionsNumber = 0;
 	private static boolean connected1 = false;
 	private static boolean connected2 = false;
+	// ips fakes pra exemplificação do consistent hashing
+	//private static String ipServer = "26.95.199.60";
+	//private static String ipServer = "192.168.10.222";
+	private static String ipServer = "40.180.45.45";
 	
 	public StorageServer(ServerRole r) {
 		role = r;
@@ -218,8 +223,8 @@ public class StorageServer implements StorageInterface {
 
 	@Override
 	public List<Car> searchCars(String name) throws RemoteException {
-		if(getPermission(StorageServer::getPermissionLogic)) {
-			List<Car> list = searchCars(name);
+		if(StorageServer.getPermission()) {
+			List<Car> list = database.searchCars(name);
 			return list;	
 		}
 		
@@ -476,6 +481,7 @@ public class StorageServer implements StorageInterface {
 
                     if (addr instanceof Inet4Address) {
 						ip = addr.getHostAddress();
+						System.out.println("O ip do server é " + ip);
 						return ip;
 					}
                 }
@@ -491,6 +497,42 @@ public class StorageServer implements StorageInterface {
 	@Override
 	public void setPermission(Permission permission) throws RemoteException {
 		backdoorPermission = permission;
+	}
+	
+	@Override
+	public int getConnectionWeight() throws RemoteException {
+		return connectionWeight;
+	}
+	
+	@Override
+	public int incrementConnectionNumber() throws RemoteException {
+		connectionsNumber = connectionsNumber + connectionWeight;
+		System.out.println("--------------------------------");
+		System.out.println("Novo número de conexões: " + connectionsNumber);
+		System.out.println("--------------------------------");
+		return connectionsNumber;
+	}
+	
+	@Override
+	public int getConnectionNumber() throws RemoteException {
+		return connectionsNumber;
+	}
+	
+	@Override
+	public int incrementRR() throws RemoteException {
+		connectionsNumber = connectionsNumber + 1;
+		System.out.println("--------------------------------");
+		System.out.println("Novo número de conexões: " + connectionsNumber);
+		System.out.println("--------------------------------");
+		return connectionsNumber;
+	}
+	
+	@Override
+	public String getIpServer() throws RemoteException {
+		System.out.println("--------------------------------");
+		System.out.println("O ip do server é: " + ipServer);
+		System.out.println("--------------------------------");
+		return ipServer;
 	}
 	
 }
