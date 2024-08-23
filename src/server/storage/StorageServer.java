@@ -50,7 +50,7 @@ public class StorageServer implements StorageInterface {
 	private static Permission gatewayPermission;
 	private static Permission backdoorPermission;
 
-	private static String ipGateway = "192.168.1.4";
+	private static String ipGateway = "10.215.34.156";
   
 	private static ExecutorService executor;
 	private static int connectionWeight = 0;

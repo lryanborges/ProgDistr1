@@ -160,6 +160,20 @@ public class Gateway implements GatewayInterface {
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, newCar.toString());
 				String signature = Encrypter.signMessage(myKeys, hmac);
 				
+				if(strategy == BalancingStrategy.WLC) {
+					storServer.incrementConnectionNumber(); // com peso de conexoes
+				} else if(strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					System.out.println("Endereço IP do Server destinatário: " + store.getIpServer() + " (líder)");
+					System.out.println("--------------------------------");
+				} else { // Round Robin
+					storServer.incrementRR();
+				}
+				
 				storServer.receiveMessage(new Message<String>(5, msgEncrypted, signature));
 				
 				System.out.println("Carro adicionado com sucesso.");
@@ -178,6 +192,20 @@ public class Gateway implements GatewayInterface {
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), editedCar.toString());
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, editedCar.toString());
 				String signature = Encrypter.signMessage(myKeys, hmac);
+				
+				if(strategy == BalancingStrategy.WLC) {
+					storServer.incrementConnectionNumber(); // com peso de conexoes
+				} else if(strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					System.out.println("Endereço IP do Server destinatário: " + store.getIpServer() + " (líder)");
+					System.out.println("--------------------------------");
+				} else { // Round Robin
+					storServer.incrementRR();
+				}
 				
 				storServer.receiveMessage(new Message<String>(6, msgEncrypted, signature));
 				
@@ -198,6 +226,20 @@ public class Gateway implements GatewayInterface {
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
 				String signature = Encrypter.signMessage(myKeys, hmac);
 				
+				if(strategy == BalancingStrategy.WLC) {
+					storServer.incrementConnectionNumber(); // com peso de conexoes
+				} else if(strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					System.out.println("Endereço IP do Server destinatário: " + store.getIpServer() + " (líder)");
+					System.out.println("--------------------------------");
+				} else { // Round Robin
+					storServer.incrementRR();
+				}
+				
 				storServer.receiveMessage(new Message<String>(7, msgEncrypted, signature));
 				System.out.println("Carro de renavam " + renavam + " deletado com sucesso.");
 			}
@@ -215,6 +257,20 @@ public class Gateway implements GatewayInterface {
 				String hmac = Hasher.hMac(myKeys.getHMACKey(), name);
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, name);
 				String signature = Encrypter.signMessage(myKeys, hmac);
+				
+				if(strategy == BalancingStrategy.WLC) {
+					storServer.incrementConnectionNumber(); // com peso de conexoes
+				} else if(strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					System.out.println("Endereço IP do Server destinatário: " + store.getIpServer() + " (líder)");
+					System.out.println("--------------------------------");
+				} else { // Round Robin
+					storServer.incrementRR();
+				}
 				
 				storServer.receiveMessage(new Message<String>(777, msgEncrypted, signature));
 				
@@ -590,6 +646,20 @@ public class Gateway implements GatewayInterface {
 				String msgEncrypted = Encrypter.fullEncrypt(myKeys, renavam);
 				String signature = Encrypter.signMessage(myKeys, hmac);
 				
+				if(strategy == BalancingStrategy.WLC) {
+					storServer.incrementConnectionNumber(); // com peso de conexoes
+				} else if(strategy == BalancingStrategy.HASHING) {
+					SecureRandom rd = new SecureRandom();
+					int ind = rd.nextInt(6);
+					
+					System.out.println("--------------------------------");
+					System.out.println("IP que está solicitando: " + ipClient[ind]);
+					System.out.println("Endereço IP do Server destinatário: " + store.getIpServer() + " (líder)");
+					System.out.println("--------------------------------");
+				} else { // Round Robin
+					storServer.incrementRR();
+				}
+				
 				Message<String> response = storServer.receiveMessage(new Message<String>(3, msgEncrypted, signature));
 
 				String decryptedMsg = Encrypter.fullDecrypt(myKeys, response.getContent());
@@ -892,9 +962,9 @@ public class Gateway implements GatewayInterface {
 		// ryan client
 		permitAccess.permit("192.168.144.218");
 		// ryan client 22/08/2024
-		permitAccess.permit("192.168.1.4");
+		permitAccess.permit("10.215.34.156");
 		// vinicius client 22/08/2024
-		permitAccess.permit("26.15.5.193");
+		permitAccess.permit("192.168.76.112");
 
 	}
 	

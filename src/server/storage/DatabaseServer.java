@@ -38,7 +38,7 @@ public class DatabaseServer implements DatabaseInterface {
     
     private static Permission storagePermission;
     
-    private static String ipLoja = "192.168.1.4";
+    private static String ipLoja = "10.215.34.156";
 
     public DatabaseServer(int rep) {
         myPath = rep;	
